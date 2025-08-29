@@ -1,184 +1,116 @@
 # ZeroTask Subagent Architecture
 
 ## Overview
-Domain-specific subagents to be called via Claude Code's Task tool for specialized knowledge during development.
+Domain-specific subagents configured in `.claude/agents/` for specialized knowledge during development. These agents are called automatically by Claude Code when their expertise is needed.
 
-## Core Domain Subagents
+## Active Subagents
 
-### 1. **api-connector-specialist**
-**Domain**: API Integration & OAuth
+### 1. **ui-ux-designer** ✅
+**Domain**: User Interface & User Experience Design
 **Responsibilities**:
-- Slack Socket Mode implementation
-- Gmail OAuth Desktop flow
-- GitHub API integration
-- Rate limiting and retry logic
-- Token management and encryption
+- Component layouts and design system recommendations
+- User interface improvements and modern design patterns
+- Dashboard and navigation design
+- Responsive design and accessibility
+- Design consistency and user flow optimization
 
-**Usage Pattern**:
-```
-Task(
-    subagent_type="api-connector-specialist",
-    description="Implement Slack connector",
-    prompt="Implement Slack Socket Mode connector following PRD 5.1 specs..."
-)
-```
+**Auto-triggered when**: User requests UI/UX design guidance, component layouts, or interface improvements.
 
-### 2. **data-pipeline-engineer**
-**Domain**: Data Processing & ETL
+### 2. **backend-system-architect** ✅
+**Domain**: Backend Architecture & System Design
 **Responsibilities**:
-- SQLite schema design and migrations
-- Event deduplication logic
-- Data validation pipelines
-- Incremental sync strategies
-- Transaction management
+- Microservices architecture design
+- API design and system scalability
+- Security best practices in backend systems
+- Database design and data flow architecture
+- Integration patterns and system reliability
 
-**Usage Pattern**:
-```
-Task(
-    subagent_type="data-pipeline-engineer", 
-    description="Design deduplication system",
-    prompt="Implement event deduplication following PRD section 8 data model..."
-)
-```
+**Auto-triggered when**: User needs backend system design, API architecture review, or system scalability guidance.
 
-### 3. **llm-integration-specialist**
-**Domain**: LLM Integration & Summarization
+### 3. **data-pipeline-security-engineer** ✅
+**Domain**: Data Pipeline Security & Compliance
 **Responsibilities**:
-- Ollama local LLM setup
-- LiteLLM BYOK integration
-- Prompt engineering for summaries
-- Response caching strategies
-- Context window management
+- Data pipeline design with security focus
+- ETL processes for sensitive data
+- Data encryption and access controls
+- GDPR/HIPAA compliance in data workflows
+- Security audits of data infrastructure
 
-**Usage Pattern**:
-```
-Task(
-    subagent_type="llm-integration-specialist",
-    description="Setup Ollama integration", 
-    prompt="Configure Ollama for local summarization following PRD 7.3..."
-)
-```
+**Auto-triggered when**: User works with data pipelines, sensitive data processing, or needs compliance guidance.
 
-### 4. **frontend-architect**
-**Domain**: Next.js UI/UX Implementation
+### 4. **lessons-learned-documentor** ✅ **(NEW)**
+**Domain**: Technical Documentation & Knowledge Capture
 **Responsibilities**:
-- Next.js component architecture
-- Daily brief UI design
-- Action buttons (draft, snooze, follow-up)
-- Real-time updates
-- Responsive design
+- Capturing development mistakes and insights
+- Documenting better approaches discovered during development
+- Creating actionable guidance from development experiences
+- Organizing lessons by technology and problem domain
+- Preventing future issues through knowledge sharing
 
-**Usage Pattern**:
-```
-Task(
-    subagent_type="frontend-architect",
-    description="Build daily brief UI",
-    prompt="Create daily brief card component following PRD UX flows..."
-)
-```
+**Auto-triggered when**: User mentions making a mistake, discovering a better approach, learning something new, or explicitly reflects on lessons learned.
 
-### 5. **security-compliance-expert**
-**Domain**: Security & Privacy
-**Responsibilities**:
-- Token encryption at rest
-- OS Keychain integration
-- OAuth security best practices
-- Data privacy compliance
-- Local-first architecture validation
+## How Claude Code Subagents Work
 
-**Usage Pattern**:
+### Automatic Agent Detection
+Claude Code automatically detects when to call subagents based on:
+- **Context analysis** of user requests
+- **Keyword triggers** in the agent descriptions
+- **Domain expertise** required for the task
+- **Code patterns** and implementation needs
+
+### Agent Communication Flow
 ```
-Task(
-    subagent_type="security-compliance-expert",
-    description="Implement token encryption",
-    prompt="Design secure token storage following PRD security requirements..."
-)
+1. User makes a request requiring specialized knowledge
+2. Claude Code analyzes the context and domain requirements
+3. Appropriate subagent is automatically invoked via Task tool
+4. Subagent provides specialized implementation/guidance
+5. Claude integrates response and continues development
+6. Updates todo list and project documentation
 ```
 
-### 6. **devops-reliability-engineer**
-**Domain**: Deployment & Monitoring
-**Responsibilities**:
-- Docker containerization
-- Cross-platform compatibility
-- Performance monitoring
-- Health checks
-- Backup/recovery procedures
+### Cross-Domain Coordination Examples
+- **ui-ux-designer** + **backend-system-architect**: Full-stack feature design
+- **data-pipeline-security-engineer** + **backend-system-architect**: Secure data architecture
+- **lessons-learned-documentor**: Called after any significant development insight
+- **ui-ux-designer**: Dashboard and component design decisions
 
-**Usage Pattern**:
-```
-Task(
-    subagent_type="devops-reliability-engineer",
-    description="Setup Docker deployment",
-    prompt="Create docker-compose setup for local deployment..."
-)
-```
+## Integration with ZeroTask Development
 
-### 7. **test-automation-specialist**
-**Domain**: Testing & Quality Assurance
-**Responsibilities**:
-- Unit test strategies
-- Integration test design
-- Mock API responses
-- End-to-end test scenarios
-- Performance testing
+### Current Implementation (Milestone 1) ✅
+- `backend-system-architect`: Designed FastAPI + SQLite architecture
+- `ui-ux-designer`: Created sidebar navigation and Sources UI
+- `data-pipeline-security-engineer`: Implemented shared service account security
 
-**Usage Pattern**:
-```
-Task(
-    subagent_type="test-automation-specialist",
-    description="Create connector tests",
-    prompt="Design test suite for API connectors with mocked responses..."
-)
-```
+### Next Phase (Milestone 2)
+- `backend-system-architect`: Gmail OAuth integration architecture
+- `data-pipeline-security-engineer`: Data deduplication and privacy compliance
+- `ui-ux-designer`: Daily brief card design and action buttons
+- `lessons-learned-documentor`: Capture development insights as they occur
 
-## Subagent Interaction Protocol
+### Future Phase (Milestone 3)
+- `backend-system-architect`: Background job scheduling and API optimization
+- `ui-ux-designer`: Advanced preferences and export features
+- `data-pipeline-security-engineer`: Data export/wipe functionality
+- `lessons-learned-documentor`: Comprehensive development knowledge base
 
-### When to Use Subagents
-1. **Complex domain-specific implementation** (>50 lines of specialized code)
-2. **Architecture decisions** requiring domain expertise
-3. **Integration challenges** with external services
-4. **Security-critical implementations**
-5. **Performance optimization** tasks
+## Agent Quality Standards
+Each subagent provides:
+- ✅ **PRD-compliant solutions** referencing specific sections
+- ✅ **Security-first approach** maintaining local-first architecture
+- ✅ **Production-ready code** with proper error handling
+- ✅ **Clear documentation** and implementation guidance
+- ✅ **Future-proof designs** following established patterns
 
-### Subagent Communication Flow
-```
-1. Claude identifies domain-specific task
-2. Calls appropriate subagent via Task tool
-3. Subagent provides specialized implementation/guidance
-4. Claude integrates response with overall project
-5. Updates todo list and continues development
-```
+## Proactive Learning with lessons-learned-documentor
+The lessons-learned-documentor agent is **proactively triggered** when:
+- Development mistakes are mentioned or discovered
+- Better approaches are found during implementation
+- Unexpected issues arise and are resolved
+- Performance problems are identified and fixed
+- Architecture decisions prove suboptimal
+- Security vulnerabilities are found and patched
 
-### Cross-Domain Coordination
-- **api-connector-specialist** + **security-compliance-expert**: OAuth implementation
-- **data-pipeline-engineer** + **llm-integration-specialist**: Summary caching
-- **frontend-architect** + **devops-reliability-engineer**: Production deployment
-
-## Integration with Development Workflow
-
-### Milestone 1 Subagents
-- `api-connector-specialist`: Slack + GitHub connectors
-- `llm-integration-specialist`: Ollama setup
-- `data-pipeline-engineer`: Basic deduplication
-- `frontend-architect`: Basic card UI
-
-### Milestone 2 Subagents
-- `api-connector-specialist`: Gmail connector
-- `security-compliance-expert`: Token encryption
-- `data-pipeline-engineer`: Priority scoring
-
-### Milestone 3 Subagents
-- `devops-reliability-engineer`: Docker deployment
-- `test-automation-specialist`: End-to-end tests
-- `security-compliance-expert`: Data export/wipe
-
-## Quality Gates
-Each subagent must:
-- ✅ Reference specific PRD sections
-- ✅ Follow data engineering requirements (Section 7)
-- ✅ Maintain local-first architecture
-- ✅ Provide implementation with error handling
-- ✅ Include relevant test strategies
+This ensures continuous learning and knowledge capture throughout the development process.
 
 ---
-*This architecture enables specialized domain expertise while maintaining PRD compliance and architectural consistency.*
+*These subagents provide specialized expertise while maintaining consistency with ZeroTask's architecture and security requirements.*

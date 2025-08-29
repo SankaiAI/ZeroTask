@@ -84,7 +84,44 @@ If Claude encounters technical blockers during implementation:
 **ZeroTask Context**: PRD Section 7 (Data Engineering Requirements), token security
 **Example**: "Implement secure token storage following PRD privacy requirements"
 
+### 📚 lessons-learned-documentor
+**Use for**: Capturing development mistakes, documenting better approaches, knowledge sharing
+**ZeroTask Context**: Development insights, architecture learnings, troubleshooting experiences
+**Example**: "Document the lesson learned from switching to shared service accounts vs individual tokens"
+**Auto-triggered when**: User mentions mistakes, discoveries, or reflects on development experiences
+
 ## Agent Usage Protocol
+
+### 🤖 Automatic Agent Invocation
+Claude Code should **proactively call agents** in these scenarios:
+
+**ui-ux-designer**:
+- User requests UI/UX design guidance
+- Building new components or layouts  
+- Interface improvements needed
+- User mentions design patterns or user experience
+
+**backend-system-architect**:
+- Designing APIs or system architecture
+- Security implementation questions
+- Scalability and performance concerns
+- Database design decisions
+
+**data-pipeline-security-engineer**:
+- Working with sensitive data or tokens
+- Implementing encryption or security measures
+- Data pipeline design or ETL processes
+- Compliance or privacy requirements
+
+**lessons-learned-documentor** (PROACTIVE):
+- User mentions making a mistake
+- User discovers a better approach
+- User learns something new during development
+- Unexpected issues arise during coding
+- User reflects on development experiences
+- Architecture decisions prove suboptimal
+
+### 🔧 Manual Agent Guidelines
 1. **Consult agents for domain expertise** on complex implementations
 2. **Always reference PRD sections** when calling agents
 3. **Agents must follow PRD constraints** (local-first, privacy, MVP scope)
