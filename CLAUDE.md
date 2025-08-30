@@ -90,6 +90,12 @@ If Claude encounters technical blockers during implementation:
 **Example**: "Document the lesson learned from switching to shared service accounts vs individual tokens"
 **Auto-triggered when**: User mentions mistakes, discoveries, or reflects on development experiences
 
+**Output Location**: 
+- **Primary File**: `LESSONS_LEARNED.md` (root directory)
+- **Format**: Markdown with timestamped entries, categorized by topic
+- **Structure**: Date, Category, Lesson Title, Description, Impact, Prevention
+- **Categories**: Architecture, Environment, Dependencies, Security, UX/UI, Development Process
+
 ## Agent Usage Protocol
 
 ### 🤖 Automatic Agent Invocation
@@ -121,6 +127,12 @@ Claude Code should **proactively call agents** in these scenarios:
 - User reflects on development experiences
 - Architecture decisions prove suboptimal
 
+**Documentation Requirements**:
+- Create/append to `LESSONS_LEARNED.md` in project root
+- Use structured format with categories and timestamps
+- Reference specific files, functions, or PRD sections when applicable
+- Include prevention strategies for future development
+
 ### 🔧 Manual Agent Guidelines
 1. **Consult agents for domain expertise** on complex implementations
 2. **Always reference PRD sections** when calling agents
@@ -151,11 +163,35 @@ cd zerotask-backend && venv\Scripts\activate
 cd zerotask-frontend && npm run dev
 ```
 
+## Environment File Safety Guidelines
+
+### 🔒 .env File Protection Protocol
+**CRITICAL**: Always check existing .env files before creating or modifying them.
+
+**Before ANY .env file operations:**
+1. ✅ Use Read tool to check if .env file exists in target directory
+2. ✅ Review existing .env content completely
+3. ✅ Only add/modify specific variables requested by user
+4. ✅ NEVER overwrite entire .env file unless explicitly confirmed by user
+5. ✅ Preserve ALL existing environment variables and comments
+
+**Modification Process:**
+- Use Edit tool for targeted changes to specific variables
+- Use MultiEdit tool for multiple variable updates in same file
+- Create backup mental note of original content before changes
+- If complete rewrite needed, explicitly ask user for confirmation
+
+**Emergency Protocol:**
+- If .env file accidentally overwritten, immediately restore from memory
+- Ask user to verify restored content matches their expectations
+- Document the incident for future prevention
+
 ## Environment Validation
 Before coding, Claude must verify:
 1. ✅ Backend venv is activated (check for `(venv)` in terminal prompt)
 2. ✅ Frontend dependencies are installed (`node_modules/` exists)
 3. ✅ Required services running (Ollama for LLM, database accessible)
+4. ✅ Existing .env files read and preserved (if working with environment configs)
 
 ## Enforcement
 - Claude will refuse to implement features not in PRD without proper change process

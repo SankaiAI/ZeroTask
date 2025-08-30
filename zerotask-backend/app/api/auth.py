@@ -1,11 +1,17 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+from app.database import get_db
 from app.services.shared_auth_service import SharedAuthService
+from app.services.gmail_oauth_service import GmailOAuthService
 from app.schemas.auth import (
     TokenStoreResponse, ConnectedProvidersResponse, AuthStatusResponse,
-    OAuthStartResponse
+    OAuthStartResponse, GmailOAuthStartResponse, GmailOAuthCallbackRequest,
+    GmailOAuthCallbackResponse, GmailConnectionStatusResponse, GmailOAuthRevokeResponse
 )
 import httpx
 from urllib.parse import urlencode
+from typing import Optional
 
 router = APIRouter(tags=["Authentication - Shared Service Accounts"])
 
@@ -126,14 +132,139 @@ async def test_slack_connection():
         )
 
 @router.get("/gmail/status")
-async def gmail_oauth_status():
+async def gmail_oauth_status(db: Session = Depends(get_db)):
     """Get Gmail OAuth configuration status"""
     try:
-        client_id, client_secret = SharedAuthService.get_gmail_credentials()
+        gmail_service = GmailOAuthService(db)
+        info = gmail_service.get_connection_info()
         return {
-            "configured": True,
-            "message": "Gmail OAuth credentials configured by IT team",
-            "client_id": client_id[:20] + "..." if len(client_id) > 20 else client_id
+            "configured": info['connected'],
+            "message": info['status'],
+            "scopes": info.get('scopes', []),
+            "expires_at": info.get('expires_at')
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error checking Gmail status: {str(e)}"
+        )
+
+# Gmail OAuth 2.0 Flow Endpoints - PRD Section 8
+@router.get("/gmail/oauth/start")
+async def start_gmail_oauth(db: Session = Depends(get_db)):
+    """Start Gmail OAuth 2.0 Desktop flow - PRD Section 8"""
+    try:
+        gmail_service = GmailOAuthService(db)
+        auth_url, state = gmail_service.get_authorization_url()
+        
+        return {
+            "authorization_url": auth_url,
+            "state": state,
+            "redirect_uri": "http://localhost:8000/oauth2/callback",
+            "scopes": ["gmail.readonly", "gmail.compose"]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error starting Gmail OAuth: {str(e)}"
+        )
+
+@router.get("/oauth2/callback")
+async def gmail_oauth_callback(
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Handle Gmail OAuth 2.0 callback - PRD Section 8"""
+    # Handle OAuth errors
+    if error:
+        return RedirectResponse(
+            url=f"http://localhost:3000/?gmail_error={error}",
+            status_code=302
+        )
+    
+    if not code or not state:
+        return RedirectResponse(
+            url="http://localhost:3000/?gmail_error=Missing code or state",
+            status_code=302
+        )
+    
+    try:
+        gmail_service = GmailOAuthService(db)
+        token_info = gmail_service.exchange_code_for_tokens(code, state)
+        
+        # Redirect to frontend with success
+        return RedirectResponse(
+            url="http://localhost:3000/?gmail_success=true",
+            status_code=302
+        )
+        
+    except Exception as e:
+        return RedirectResponse(
+            url=f"http://localhost:3000/?gmail_error=OAuth failed: {str(e)}",
+            status_code=302
+        )
+
+@router.post("/gmail/oauth/revoke")
+async def revoke_gmail_oauth(db: Session = Depends(get_db)):
+    """Revoke Gmail OAuth access and clean up tokens"""
+    try:
+        gmail_service = GmailOAuthService(db)
+        success = gmail_service.revoke_tokens()
+        
+        return {
+            "success": success,
+            "message": "Gmail OAuth access revoked successfully" if success else "No tokens to revoke"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error revoking Gmail OAuth: {str(e)}"
+        )
+
+@router.get("/gmail/test")
+async def test_gmail_connection(db: Session = Depends(get_db)):
+    """Test Gmail API connection with current OAuth tokens"""
+    try:
+        gmail_service = GmailOAuthService(db)
+        credentials = gmail_service.get_valid_credentials()
+        
+        if not credentials:
+            raise HTTPException(
+                status_code=401,
+                detail="Gmail not authenticated. Complete OAuth flow first."
+            )
+        
+        # Test Gmail API access
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+                headers={"Authorization": f"Bearer {credentials.token}"}
+            )
+            
+            if response.status_code == 200:
+                profile_data = response.json()
+                return {
+                    "success": True,
+                    "message": "Gmail connection test successful",
+                    "email": profile_data.get("emailAddress"),
+                    "total_messages": profile_data.get("messagesTotal", 0)
+                }
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Gmail API test failed: {response.status_code}"
+                )
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error testing Gmail connection: {str(e)}"
+        )

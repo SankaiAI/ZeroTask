@@ -5,7 +5,7 @@ import uvicorn
 
 from app.config import settings
 from app.database import create_tables
-from app.api import health, auth
+from app.api import health, auth, gmail
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,6 +50,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1/auth")
+app.include_router(gmail.router, prefix="/api/v1/gmail")
 
 @app.get("/")
 async def root():

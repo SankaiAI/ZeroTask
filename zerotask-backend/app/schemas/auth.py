@@ -30,7 +30,7 @@ class SlackConnectRequest(BaseModel):
 class GmailOAuthRequest(BaseModel):
     """Gmail OAuth authorization request"""
     authorization_code: str = Field(..., description="OAuth authorization code")
-    redirect_uri: str = Field(default="http://localhost:8000/auth/gmail/callback")
+    redirect_uri: str = Field(default="http://localhost:8000/oauth2/callback")
 
 class OAuthStartResponse(BaseModel):
     """OAuth flow initiation response"""
@@ -42,3 +42,40 @@ class AuthStatusResponse(BaseModel):
     provider: str
     connected: bool
     last_updated: Optional[datetime] = None
+
+# Gmail-specific OAuth schemas
+class GmailOAuthStartResponse(BaseModel):
+    """Gmail OAuth authorization flow start response"""
+    authorization_url: str = Field(..., description="Google OAuth authorization URL")
+    state: str = Field(..., description="CSRF protection state parameter")
+    redirect_uri: str = Field(..., description="OAuth callback URI")
+    scopes: List[str] = Field(..., description="Requested Gmail scopes")
+
+class GmailOAuthCallbackRequest(BaseModel):
+    """Gmail OAuth callback parameters"""
+    code: str = Field(..., description="Authorization code from Google")
+    state: str = Field(..., description="State parameter for CSRF validation")
+    scope: Optional[str] = Field(None, description="Granted scopes from Google")
+
+class GmailOAuthCallbackResponse(BaseModel):
+    """Gmail OAuth callback processing response"""
+    success: bool = Field(..., description="OAuth flow success status")
+    message: str = Field(..., description="Human-readable status message")
+    user_email: Optional[str] = Field(None, description="Authenticated user email")
+    scopes: Optional[List[str]] = Field(None, description="Granted OAuth scopes")
+    expires_at: Optional[str] = Field(None, description="Token expiration timestamp")
+
+class GmailConnectionStatusResponse(BaseModel):
+    """Gmail OAuth connection status response"""
+    configured: bool = Field(..., description="OAuth credentials configured by IT")
+    authenticated: bool = Field(..., description="User has completed OAuth flow")
+    message: str = Field(..., description="Status message")
+    user_email: Optional[str] = Field(None, description="Connected Gmail account")
+    scopes: Optional[List[str]] = Field(None, description="Current OAuth scopes")
+    expires_at: Optional[str] = Field(None, description="Token expiration")
+    client_id_preview: Optional[str] = Field(None, description="Preview of OAuth client ID")
+
+class GmailOAuthRevokeResponse(BaseModel):
+    """Gmail OAuth revocation response"""
+    success: bool = Field(..., description="Revocation success status")
+    message: str = Field(..., description="Revocation status message")

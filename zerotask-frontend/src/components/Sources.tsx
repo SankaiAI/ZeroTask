@@ -52,6 +52,25 @@ export function Sources() {
     fetchStatus();
   }, []);
 
+  // Handle Gmail OAuth callback results
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const gmailSuccess = urlParams.get('gmail_success');
+    const gmailError = urlParams.get('gmail_error');
+    const userEmail = urlParams.get('email');
+    
+    if (gmailSuccess === 'true') {
+      alert(`✅ Gmail OAuth connected successfully!${userEmail ? `\nEmail: ${userEmail}` : ''}`);
+      // Clear URL parameters and reload to update status
+      window.history.replaceState({}, document.title, window.location.pathname);
+      window.location.reload();
+    } else if (gmailError) {
+      alert(`❌ Gmail OAuth failed:\n${decodeURIComponent(gmailError)}`);
+      // Clear URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const handleTestConnection = async (provider: string) => {
     setTesting(provider);
     
@@ -72,20 +91,101 @@ export function Sources() {
     }
   };
 
-  const handleGmailStatus = async () => {
+  const handleGmailOAuth = async () => {
     setTesting('gmail');
     
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/gmail/status');
+      // Get current Gmail status first
+      const statusResponse = await fetch('http://localhost:8000/api/v1/auth/gmail/status');
+      const statusResult = await statusResponse.json();
+      
+      if (!statusResult.configured) {
+        alert(`❌ Gmail OAuth not configured by IT team:\n${statusResult.message}`);
+        setTesting(null);
+        return;
+      }
+      
+      if (statusResult.authenticated) {
+        // Already authenticated - show status and offer to disconnect
+        const disconnect = confirm(
+          `✅ Gmail OAuth Connected!\n` +
+          `Email: ${statusResult.user_email}\n` +
+          `Scopes: ${statusResult.scopes?.join(', ')}\n\n` +
+          `Click OK to disconnect Gmail OAuth or Cancel to keep connected.`
+        );
+        
+        if (disconnect) {
+          await handleGmailRevoke();
+        }
+        setTesting(null);
+        return;
+      }
+      
+      // Start OAuth flow
+      const oauthResponse = await fetch('http://localhost:8000/api/v1/auth/gmail/oauth/start');
+      
+      if (oauthResponse.ok) {
+        const oauthResult = await oauthResponse.json();
+        
+        // Open OAuth URL in new window
+        window.open(
+          oauthResult.authorization_url,
+          'gmail-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+        
+        alert('🔐 Gmail OAuth window opened!\nComplete the authorization in the new window. You will be redirected back to this page when complete.');
+      } else {
+        const errorResult = await oauthResponse.json();
+        alert(`❌ Error starting Gmail OAuth:\n${errorResult.detail}`);
+      }
+    } catch (error) {
+      alert('❌ Network error with Gmail OAuth');
+      console.error(error);
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const handleGmailRevoke = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/gmail/oauth/revoke', {
+        method: 'POST'
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('✅ Gmail OAuth disconnected successfully');
+        // Refresh page to update status
+        window.location.reload();
+      } else {
+        alert(`❌ Error disconnecting Gmail:\n${result.message}`);
+      }
+    } catch (error) {
+      alert('❌ Network error disconnecting Gmail');
+      console.error(error);
+    }
+  };
+
+  const handleGmailTest = async () => {
+    setTesting('gmail');
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/gmail/test');
       const result = await response.json();
       
       if (response.ok) {
-        alert(`✅ Gmail OAuth configuration found!\nClient ID: ${result.client_id}`);
+        alert(
+          `✅ Gmail API Test Successful!\n\n` +
+          `Email: ${result.email}\n` +
+          `Total Messages: ${result.total_messages}\n` +
+          `Total Threads: ${result.total_threads}`
+        );
       } else {
-        alert(`❌ Gmail not configured:\n${result.detail}`);
+        alert(`❌ Gmail API Test Failed:\n${result.detail}`);
       }
     } catch (error) {
-      alert('❌ Network error checking Gmail status');
+      alert('❌ Network error testing Gmail API');
       console.error(error);
     } finally {
       setTesting(null);
@@ -160,11 +260,18 @@ export function Sources() {
                 {showInstructions.gmail ? 'Hide' : 'IT Setup info'}
               </button>
               <button 
-                onClick={handleGmailStatus}
+                onClick={handleGmailOAuth}
                 disabled={testing === 'gmail'}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                {testing === 'gmail' ? 'Checking...' : 'Check Status'}
+                {testing === 'gmail' ? 'Processing...' : 'Connect Gmail'}
+              </button>
+              <button 
+                onClick={handleGmailTest}
+                disabled={testing === 'gmail' || !authStatus.gmail?.connected}
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+              >
+                {testing === 'gmail' ? 'Testing...' : 'Test API'}
               </button>
             </div>
           </div>
