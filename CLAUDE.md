@@ -33,6 +33,33 @@ If Claude identifies need for scope changes during development:
 
 ## Development Rules
 
+### 🔍 Research-First Development Protocol
+**CRITICAL**: Always research requirements thoroughly before implementing major changes.
+
+**Before ANY significant implementation:**
+1. ✅ Research API documentation and best practices for the technology
+2. ✅ Use WebSearch tool to verify requirements make technical sense
+3. ✅ Consider if there are simpler solutions (configuration vs code changes)
+4. ✅ Question whether requirements fit development vs production context
+5. ✅ Validate that complex implementations are truly necessary
+
+**Examples of research-required changes:**
+- Adding HTTPS/SSL configurations
+- Implementing new authentication flows
+- Making architectural changes (databases, servers, protocols)
+- Adding external service integrations
+- Security implementations
+
+**Research Tools Available:**
+- WebSearch for official documentation
+- WebFetch for specific API documentation pages
+- Task tool with specialized agents for domain expertise
+
+**When user provides error messages:**
+- Research the error in official documentation first
+- Verify if the requirement is actually needed for development environment
+- Consider configuration-based solutions before code changes
+
 ### 🎯 Implementation Fidelity
 - Implement exactly what's specified in PRD.md
 - No feature creep or "improvements" without explicit approval

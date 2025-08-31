@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="", description="Google OAuth client ID")
     google_client_secret: str = Field(default="", description="Google OAuth client secret")
     
+    # Individual OAuth Credentials (User connections)
+    slack_client_id: str = Field(default="", description="Slack OAuth client ID")
+    slack_client_secret: str = Field(default="", description="Slack OAuth client secret")
+    
     # Development
     debug: bool = Field(default=False)
     

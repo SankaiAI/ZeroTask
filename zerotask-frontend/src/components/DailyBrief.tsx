@@ -6,9 +6,10 @@ interface DailyBriefProps {
   brief: DailyBriefType;
   onCardAction: (cardId: string, action: string) => void;
   onRefresh: () => void;
+  loading?: boolean;
 }
 
-export function DailyBrief({ brief, onCardAction, onRefresh }: DailyBriefProps) {
+export function DailyBrief({ brief, onCardAction, onRefresh, loading }: DailyBriefProps) {
   const { totalCards, bySource, lastUpdated } = brief.stats;
 
   return (
@@ -30,9 +31,10 @@ export function DailyBrief({ brief, onCardAction, onRefresh }: DailyBriefProps) 
             </div>
             <button
               onClick={onRefresh}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={loading}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ↻ Refresh
+              {loading ? '⟳' : '↻'} {loading ? 'Loading...' : 'Refresh'}
             </button>
           </div>
         </div>

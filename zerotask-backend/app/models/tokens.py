@@ -26,6 +26,7 @@ class OAuthToken(Base):
     token_type = Column(String(20), default="Bearer")  # OAuth token type
     expires_at = Column(DateTime(timezone=True), nullable=True)  # Token expiration time
     scope = Column(Text, nullable=True)  # Granted OAuth scopes
+    user_info = Column(Text, nullable=True)  # JSON string with user profile information
     is_active = Column(Boolean, default=True)  # Token validity status
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

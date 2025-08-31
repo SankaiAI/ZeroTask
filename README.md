@@ -42,7 +42,7 @@ ZeroTask is a local-first desktop/web application that aggregates your Gmail, Sl
    ```
 
 4. **Access the application:**
-   - Frontend: http://localhost:3000
+   - Frontend: http://localhost:3001 (or 3000 if available)
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
 
@@ -50,17 +50,24 @@ ZeroTask is a local-first desktop/web application that aggregates your Gmail, Sl
 
 ### Core Functionality
 - **📧 Gmail Integration** - Read emails and create draft replies (OAuth 2.0)
-- **💬 Slack Integration** - Track @mentions and channel messages (Socket Mode)
-- **🔧 GitHub Integration** - Monitor assigned issues and PR reviews
+- **💬 Slack Integration** - Individual user OAuth with profile display and API access
+- **🔧 GitHub Integration** - Monitor assigned issues and PR reviews (Service Account)
 - **🤖 AI-Powered Summarization** - Using local Ollama or BYOK LLM providers
 - **🔗 Smart Deduplication** - Merge related items across platforms
 - **⚡ Action-Ready Cards** - Open, reply, snooze, and follow-up actions
 
 ### Privacy & Security
 - **🏠 Local-First Architecture** - All data stored locally
-- **🔐 Encrypted Token Storage** - Service account credentials secured
-- **🏢 Company Deployment Ready** - IT-managed shared service accounts
+- **🔐 Encrypted Token Storage** - OAuth tokens and service credentials secured with AES-256
+- **👤 Individual User Authentication** - Personal OAuth flows for Gmail and Slack
+- **🏢 Company Deployment Ready** - IT-managed service accounts for GitHub
 - **🔒 No Central Server** - Zero data sent to external services
+
+### Recent Enhancements
+- **👨‍💼 User Profile Display** - Show Slack user avatars, names, emails, and titles
+- **🎯 Improved UX** - Removed intrusive alert popups, console logging for debugging
+- **🔗 OAuth Callback Handling** - Seamless popup-based OAuth flows with automatic status updates
+- **🛡️ Enhanced Security** - Proper token encryption and secure credential management
 
 ### Technical Stack
 - **Frontend:** Next.js 14, TypeScript, Tailwind CSS
@@ -98,19 +105,21 @@ For company internal deployment, IT teams configure shared service accounts:
 export GITHUB_TOKEN=ghp_your_service_account_token
 ```
 
-### 2. Slack Company App
+### 2. Slack OAuth Application
 ```bash
-# Create company Slack app with Socket Mode
-# Configure scopes: app_mentions:read, channels:history, chat:write, im:history
-export SLACK_APP_TOKEN=xapp_your_app_token
-export SLACK_BOT_TOKEN=xoxb_your_bot_token
+# Create Slack OAuth app for individual user authentication
+# Configure OAuth scopes: channels:read, chat:write, users:read, users:read.email, channels:history, groups:read, im:read
+export SLACK_CLIENT_ID=your_oauth_client_id
+export SLACK_CLIENT_SECRET=your_oauth_client_secret
+# Configure OAuth redirect URI: https://your-domain.com/oauth2/slack/callback
 ```
 
-### 3. Gmail OAuth (Future)
+### 3. Gmail OAuth
 ```bash
 # Configure Google Cloud OAuth 2.0 credentials
 export GOOGLE_CLIENT_ID=your_oauth_client_id
 export GOOGLE_CLIENT_SECRET=your_oauth_client_secret
+# Configure OAuth redirect URI: http://localhost:8000/oauth2/callback
 ```
 
 📋 **See [IT_SETUP.md](IT_SETUP.md) for detailed configuration instructions.**
@@ -144,12 +153,14 @@ cp .env.example .env
 
 ## 🔌 API Endpoints
 
-### Authentication (Shared Service Accounts)
+### Authentication
 - `GET /api/v1/auth/validate` - Check all service configurations
 - `GET /api/v1/auth/status/{provider}` - Get provider connection status
 - `GET /api/v1/auth/github/test` - Test GitHub connection
-- `GET /api/v1/auth/slack/test` - Test Slack connection
-- `GET /api/v1/auth/gmail/status` - Check Gmail configuration
+- `GET /api/v1/auth/slack/oauth/status` - Get Slack OAuth status and user profile
+- `GET /api/v1/auth/slack/oauth/start` - Start Slack OAuth flow
+- `GET /api/v1/auth/gmail/status` - Check Gmail OAuth configuration
+- `GET /api/v1/auth/gmail/oauth/start` - Start Gmail OAuth flow
 
 ### Health & Monitoring
 - `GET /api/v1/health` - API health check
@@ -164,12 +175,13 @@ ZeroTask/
 ├── zerotask-frontend/          # Next.js frontend
 │   ├── src/components/         # React components
 │   ├── src/app/               # App router pages
-│   └── src/lib/               # Utilities and helpers
+│   ├── src/lib/               # Utilities and helpers
+│   └── public/                # Static files and OAuth callbacks
 ├── zerotask-backend/          # FastAPI backend
 │   ├── app/api/               # API endpoints
 │   ├── app/models/            # SQLAlchemy models
-│   ├── app/services/          # Business logic
-│   └── app/utils/             # Utilities
+│   ├── app/services/          # Business logic (including OAuth services)
+│   └── app/utils/             # Utilities and encryption
 └── docs/                      # Documentation
 ```
 
@@ -248,17 +260,23 @@ docker-compose up --build
 - [x] Basic daily brief generation
 - [x] IT setup documentation
 
-### Milestone 2 (Next)
-- [ ] Gmail OAuth integration
+### Milestone 2 ✅ (Completed)
+- [x] Gmail OAuth integration
+- [x] Slack individual user OAuth with profile display
+- [x] Enhanced frontend with user profile avatars
+- [x] Improved error handling and user experience
+
+### Milestone 3 (Next)
 - [ ] LLM summarization with Ollama
 - [ ] Priority scoring algorithm
 - [ ] Follow-up task management
-
-### Milestone 3 (Future)
 - [ ] Advanced deduplication
+
+### Milestone 4 (Future)
 - [ ] Export to Markdown
 - [ ] Background job scheduling
 - [ ] Enhanced preferences UI
+- [ ] Mobile responsiveness
 
 ## 🛡️ Security & Privacy
 

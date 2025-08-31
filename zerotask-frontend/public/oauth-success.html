@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Success</title>
+</head>
+<body>
+    <script>
+        // Close the popup and notify parent
+        try {
+            if (window.opener) {
+                // Try to notify parent window
+                window.opener.postMessage({ type: 'oauth_success', provider: 'slack' }, '*');
+            }
+        } catch (e) {
+            console.log('Could not notify parent window:', e);
+        }
+        
+        // Close this popup window
+        setTimeout(() => {
+            window.close();
+        }, 1000);
+        
+        // Show a message to user
+        document.body.innerHTML = `
+            <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+                <h2>✅ Slack Connected Successfully!</h2>
+                <p>This window will close automatically...</p>
+                <p>If it doesn't close, you can safely close it manually.</p>
+            </div>
+        `;
+    </script>
+</body>
+</html>

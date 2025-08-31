@@ -1,17 +1,158 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { DailyBrief } from '@/components/DailyBrief';
 import { Sources } from '@/components/Sources';
 import { Preferences } from '@/components/Preferences';
 import { Settings } from '@/components/Settings';
-import { mockDailyBrief } from '@/lib/mockData';
 
 export default function Home() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [brief, setBrief] = useState(mockDailyBrief);
+  const [brief, setBrief] = useState({
+    id: `daily-brief-${new Date().toISOString().split('T')[0]}`,
+    date: new Date().toISOString().split('T')[0],
+    cards: [],
+    stats: {
+      totalCards: 0,
+      bySource: {},
+      lastUpdated: new Date().toISOString()
+    }
+  });
+  const [loading, setLoading] = useState(false);
+
+  // Function to fetch Slack daily brief and convert to cards
+  const fetchSlackDailyBrief = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/slack/daily-brief');
+      if (response.ok) {
+        const slackData = await response.json();
+        
+        // Create Slack cards from the data
+        const slackCards = [];
+        
+        // Card 1: Workspace Overview
+        slackCards.push({
+          id: `slack-overview-${Date.now()}`,
+          title: `📊 Slack Workspace Summary`,
+          summary: [`Connected to ${slackData.stats.total_channels} channels. ${slackData.stats.messages_today} messages today, ${slackData.stats.mentions_today} mentions.`],
+          evidenceLinks: [],
+          primarySource: 'slack',
+          sources: ['slack'],
+          priorityScore: 7,
+          createdAt: slackData.generated_at,
+          actions: [
+            {
+              type: 'open',
+              label: 'Open Slack',
+              enabled: true,
+              url: 'https://app.slack.com'
+            }
+          ]
+        });
+
+        // Card 2: Channel List (if any)
+        if (slackData.channels && slackData.channels.length > 0) {
+          slackCards.push({
+            id: `slack-channels-${Date.now()}`,
+            title: `📁 Active Channels`,
+            summary: [`You have access to ${slackData.channels.length} channels: ${slackData.channels.map(ch => `#${ch.name}`).join(', ')}`],
+            evidenceLinks: [],
+            primarySource: 'slack',
+            sources: ['slack'],
+            priorityScore: 5,
+            createdAt: slackData.generated_at,
+            actions: [
+              {
+                type: 'open',
+                label: 'View Channels',
+                enabled: true,
+                url: 'https://app.slack.com'
+              }
+            ]
+          });
+        }
+
+        // Card 3: Recent Messages (if any)
+        if (slackData.recent_messages && slackData.recent_messages.length > 0) {
+          slackCards.push({
+            id: `slack-messages-${Date.now()}`,
+            title: `💬 Recent Activity`,
+            summary: [`${slackData.recent_messages.length} recent messages across your channels`],
+            evidenceLinks: [],
+            primarySource: 'slack',
+            sources: ['slack'],
+            priorityScore: 8,
+            createdAt: slackData.generated_at,
+            actions: [
+              {
+                type: 'open',
+                label: 'View Messages',
+                enabled: true,
+                url: 'https://app.slack.com'
+              }
+            ]
+          });
+        }
+
+        // Card 4: Mentions (if any)
+        if (slackData.mentions && slackData.mentions.length > 0) {
+          slackCards.push({
+            id: `slack-mentions-${Date.now()}`,
+            title: `🔔 You were mentioned`,
+            summary: [`${slackData.mentions.length} messages mention you today`],
+            evidenceLinks: [],
+            primarySource: 'slack',
+            sources: ['slack'],
+            priorityScore: 9,
+            createdAt: slackData.generated_at,
+            actions: [
+              {
+                type: 'open',
+                label: 'View Mentions',
+                enabled: true,
+                url: 'https://app.slack.com'
+              }
+            ]
+          });
+        }
+
+        // Update brief with Slack cards
+        const updatedBrief = {
+          id: `daily-brief-${new Date().toISOString().split('T')[0]}`,
+          date: new Date().toISOString().split('T')[0],
+          cards: slackCards,
+          stats: {
+            totalCards: slackCards.length,
+            bySource: {
+              slack: slackCards.length
+            },
+            lastUpdated: new Date().toISOString()
+          }
+        };
+
+        setBrief(updatedBrief);
+        console.log('✅ Slack daily brief loaded:', updatedBrief);
+      } else {
+        console.error('❌ Failed to fetch Slack data:', response.status);
+        // Keep showing empty state if Slack fetch fails
+      }
+    } catch (error) {
+      console.error('❌ Error fetching Slack daily brief:', error);
+      // Keep showing empty state if there's an error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load Slack data on component mount and when dashboard is viewed
+  useEffect(() => {
+    if (currentView === 'dashboard') {
+      fetchSlackDailyBrief();
+    }
+  }, [currentView]);
 
   const handleCardAction = (cardId: string, action: string) => {
     console.log(`Action: ${action} on card: ${cardId}`);
@@ -52,9 +193,8 @@ export default function Home() {
   };
 
   const handleRefresh = () => {
-    // Simulate refresh - in real app, this would fetch new data from API
-    setBrief({ ...mockDailyBrief });
     console.log('Refreshing daily brief...');
+    fetchSlackDailyBrief();
   };
 
   const renderCurrentView = () => {
@@ -65,6 +205,7 @@ export default function Home() {
             brief={brief}
             onCardAction={handleCardAction}
             onRefresh={handleRefresh}
+            loading={loading}
           />
         );
       case 'sources':

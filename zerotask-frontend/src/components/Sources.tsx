@@ -6,6 +6,26 @@ interface AuthStatus {
   last_updated?: string;
 }
 
+interface UserInfo {
+  user_id?: string;
+  name?: string;
+  email?: string;
+  avatar_url?: string;
+  title?: string;
+  team_id?: string;
+  is_admin?: boolean;
+  timezone?: string;
+}
+
+interface SlackOAuthStatus {
+  configured: boolean;
+  authenticated?: boolean;
+  message: string;
+  scopes?: string[];
+  expires_at?: string;
+  user_info?: UserInfo;
+}
+
 interface ValidationResult {
   status_code: number;
   message: string;
@@ -22,6 +42,7 @@ export function Sources() {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState<Record<string, boolean>>({});
+  const [slackOAuthStatus, setSlackOAuthStatus] = useState<SlackOAuthStatus | null>(null);
 
   // Fetch IT-configured service account status
   useEffect(() => {
@@ -50,25 +71,73 @@ export function Sources() {
     };
 
     fetchStatus();
+    fetchSlackOAuthStatus();
   }, []);
 
-  // Handle Gmail OAuth callback results
+  // Fetch Slack OAuth status including user profile
+  const fetchSlackOAuthStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/slack/oauth/status');
+      if (response.ok) {
+        const slackStatus = await response.json();
+        setSlackOAuthStatus(slackStatus);
+      }
+    } catch (error) {
+      console.error('Failed to fetch Slack OAuth status:', error);
+    }
+  };
+
+  // Handle OAuth callback results
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // Gmail OAuth callbacks
     const gmailSuccess = urlParams.get('gmail_success');
     const gmailError = urlParams.get('gmail_error');
     const userEmail = urlParams.get('email');
     
+    // Slack OAuth callbacks (legacy URL-based)
+    const slackSuccess = urlParams.get('slack_success');
+    const slackError = urlParams.get('slack_error');
+    
     if (gmailSuccess === 'true') {
-      alert(`✅ Gmail OAuth connected successfully!${userEmail ? `\nEmail: ${userEmail}` : ''}`);
+      console.log(`✅ Gmail OAuth connected successfully!${userEmail ? ` Email: ${userEmail}` : ''}`);
       // Clear URL parameters and reload to update status
       window.history.replaceState({}, document.title, window.location.pathname);
       window.location.reload();
     } else if (gmailError) {
-      alert(`❌ Gmail OAuth failed:\n${decodeURIComponent(gmailError)}`);
+      console.error(`❌ Gmail OAuth failed: ${decodeURIComponent(gmailError)}`);
+      // Clear URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (slackSuccess === 'true') {
+      console.log(`✅ Slack OAuth connected successfully!`);
+      // Clear URL parameters and reload to update status
+      window.history.replaceState({}, document.title, window.location.pathname);
+      window.location.reload();
+    } else if (slackError) {
+      console.error(`❌ Slack OAuth failed: ${decodeURIComponent(slackError)}`);
       // Clear URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    
+    // Listen for OAuth popup messages
+    const handleOAuthMessage = (event: MessageEvent) => {
+      console.log('Received OAuth message:', event.data);
+      
+      if (event.data && event.data.type === 'oauth_success' && event.data.provider === 'slack') {
+        console.log('✅ Slack OAuth connected successfully!');
+        // Refresh Slack status instead of full page reload
+        fetchSlackOAuthStatus();
+      } else if (event.data && event.data.type === 'oauth_error' && event.data.provider === 'slack') {
+        console.error(`❌ Slack OAuth failed: ${event.data.error}`);
+      }
+    };
+    
+    window.addEventListener('message', handleOAuthMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleOAuthMessage);
+    };
   }, []);
 
   const handleTestConnection = async (provider: string) => {
@@ -79,12 +148,12 @@ export function Sources() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(`✅ ${provider} connection test successful!\n${result.message}`);
+        console.log(`✅ ${provider} connection test successful! ${result.message}`);
       } else {
-        alert(`❌ ${provider} connection test failed:\n${result.detail}`);
+        console.error(`❌ ${provider} connection test failed: ${result.detail}`);
       }
     } catch (error) {
-      alert(`❌ Network error testing ${provider} connection`);
+      console.error(`❌ Network error testing ${provider} connection`);
       console.error(error);
     } finally {
       setTesting(null);
@@ -100,7 +169,7 @@ export function Sources() {
       const statusResult = await statusResponse.json();
       
       if (!statusResult.configured) {
-        alert(`❌ Gmail OAuth not configured by IT team:\n${statusResult.message}`);
+        console.error(`❌ Gmail OAuth not configured by IT team: ${statusResult.message}`);
         setTesting(null);
         return;
       }
@@ -127,20 +196,70 @@ export function Sources() {
       if (oauthResponse.ok) {
         const oauthResult = await oauthResponse.json();
         
+        console.log('=== Gmail OAuth Debug Info ===');
+        console.log('Authorization URL:', oauthResult.authorization_url);
+        console.log('Redirect URI:', oauthResult.redirect_uri);
+        console.log('State:', oauthResult.state);
+        console.log('Current Origin:', window.location.origin);
+        console.log('Current URL:', window.location.href);
+        
+        // Parse and validate the OAuth URL
+        try {
+          const oauthUrl = new URL(oauthResult.authorization_url);
+          console.log('=== OAuth URL Breakdown ===');
+          console.log('Host:', oauthUrl.host);
+          console.log('Client ID:', oauthUrl.searchParams.get('client_id'));
+          console.log('Redirect URI param:', decodeURIComponent(oauthUrl.searchParams.get('redirect_uri') || ''));
+          console.log('Scope:', decodeURIComponent(oauthUrl.searchParams.get('scope') || ''));
+          console.log('Response Type:', oauthUrl.searchParams.get('response_type'));
+        } catch (e) {
+          console.error('Error parsing OAuth URL:', e);
+        }
+        
+        // Test the OAuth URL accessibility first
+        console.log('=== Testing OAuth URL Accessibility ===');
+        fetch(oauthResult.authorization_url.split('?')[0], { 
+          method: 'HEAD',
+          mode: 'no-cors'
+        })
+        .then(() => console.log('OAuth endpoint is reachable'))
+        .catch(err => console.error('OAuth endpoint test failed:', err));
+        
         // Open OAuth URL in new window
-        window.open(
+        const authWindow = window.open(
           oauthResult.authorization_url,
           'gmail-oauth',
           'width=600,height=700,scrollbars=yes,resizable=yes'
         );
         
-        alert('🔐 Gmail OAuth window opened!\nComplete the authorization in the new window. You will be redirected back to this page when complete.');
+        console.log('Auth window opened:', authWindow !== null);
+        
+        // Monitor the popup window
+        if (authWindow) {
+          const checkClosed = setInterval(() => {
+            if (authWindow.closed) {
+              clearInterval(checkClosed);
+              console.log('OAuth popup was closed');
+            }
+          }, 1000);
+          
+          // Try to monitor URL changes (may be blocked by CORS)
+          try {
+            authWindow.addEventListener('beforeunload', () => {
+              console.log('OAuth window is navigating');
+            });
+          } catch (e) {
+            console.log('Cannot monitor popup navigation (CORS blocked)');
+          }
+        }
+        
+        console.log('Gmail OAuth window opened! Complete the authorization in the new window. You will be redirected back to this page when complete. Check browser console for debug info.');
       } else {
         const errorResult = await oauthResponse.json();
-        alert(`❌ Error starting Gmail OAuth:\n${errorResult.detail}`);
+        console.error(`❌ Error starting Gmail OAuth: ${errorResult.detail}`);
       }
     } catch (error) {
-      alert('❌ Network error with Gmail OAuth');
+      console.error('❌ Network error with Gmail OAuth');
       console.error(error);
     } finally {
       setTesting(null);
@@ -155,17 +274,108 @@ export function Sources() {
       const result = await response.json();
       
       if (result.success) {
-        alert('✅ Gmail OAuth disconnected successfully');
+        console.log('✅ Gmail OAuth disconnected successfully');
         // Refresh page to update status
         window.location.reload();
       } else {
-        alert(`❌ Error disconnecting Gmail:\n${result.message}`);
+        console.error(`❌ Error disconnecting Gmail: ${result.message}`);
       }
     } catch (error) {
-      alert('❌ Network error disconnecting Gmail');
+      console.error('❌ Network error disconnecting Gmail');
       console.error(error);
     }
   };
+
+  const handleSlackOAuth = async () => {
+    setTesting('slack-oauth');
+    
+    try {
+      // Get current Slack OAuth status first
+      const statusResponse = await fetch('http://localhost:8000/api/v1/auth/slack/oauth/status');
+      const statusResult = await statusResponse.json();
+      
+      if (!statusResult.configured) {
+        console.error(`❌ Slack OAuth not configured by IT team: ${statusResult.message}`);
+        setTesting(null);
+        return;
+      }
+      
+      if (statusResult.authenticated) {
+        // Already authenticated - show status and offer to disconnect
+        const disconnect = confirm(
+          `✅ Slack OAuth Connected!\n` +
+          `Scopes: ${statusResult.scopes?.join(', ')}\n\n` +
+          `Click OK to disconnect Slack OAuth or Cancel to keep connected.`
+        );
+        
+        if (disconnect) {
+          await handleSlackRevoke();
+        }
+        setTesting(null);
+        return;
+      }
+      
+      // Start OAuth flow
+      const oauthResponse = await fetch('http://localhost:8000/api/v1/auth/slack/oauth/start');
+      
+      if (oauthResponse.ok) {
+        const oauthResult = await oauthResponse.json();
+        
+        console.log('=== Slack OAuth Debug Info ===');
+        console.log('Authorization URL:', oauthResult.authorization_url);
+        console.log('Redirect URI:', oauthResult.redirect_uri);
+        console.log('State:', oauthResult.state);
+        console.log('Scopes:', oauthResult.scopes);
+        
+        // Open OAuth URL in new window
+        const authWindow = window.open(
+          oauthResult.authorization_url,
+          'slack-oauth',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+        
+        if (authWindow) {
+          const checkClosed = setInterval(() => {
+            if (authWindow.closed) {
+              clearInterval(checkClosed);
+              console.log('Slack OAuth popup was closed');
+            }
+          }, 1000);
+        }
+        
+        console.log('Slack OAuth window opened! Complete the authorization in the new window. You will be redirected back to this page when complete.');
+      } else {
+        const errorResult = await oauthResponse.json();
+        console.error(`❌ Error starting Slack OAuth: ${errorResult.detail}`);
+      }
+    } catch (error) {
+      console.error('❌ Network error with Slack OAuth');
+      console.error(error);
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const handleSlackRevoke = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/slack/oauth/revoke', {
+        method: 'POST'
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Slack OAuth disconnected successfully');
+        // Refresh page to update status
+        window.location.reload();
+      } else {
+        console.error(`❌ Error disconnecting Slack: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('❌ Network error disconnecting Slack');
+      console.error(error);
+    }
+  };
+
 
   const handleGmailTest = async () => {
     setTesting('gmail');
@@ -175,17 +385,17 @@ export function Sources() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(
-          `✅ Gmail API Test Successful!\n\n` +
-          `Email: ${result.email}\n` +
-          `Total Messages: ${result.total_messages}\n` +
+        console.log(
+          `✅ Gmail API Test Successful! ` +
+          `Email: ${result.email} ` +
+          `Total Messages: ${result.total_messages} ` +
           `Total Threads: ${result.total_threads}`
         );
       } else {
-        alert(`❌ Gmail API Test Failed:\n${result.detail}`);
+        console.error(`❌ Gmail API Test Failed: ${result.detail}`);
       }
     } catch (error) {
-      alert('❌ Network error testing Gmail API');
+      console.error('❌ Network error testing Gmail API');
       console.error(error);
     } finally {
       setTesting(null);
@@ -313,10 +523,14 @@ export function Sources() {
               <span className="text-2xl">💬</span>
               <div>
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  Slack
-                  {authStatus.slack?.connected ? (
+                  Slack (Individual OAuth)
+                  {slackOAuthStatus?.configured && slackOAuthStatus?.authenticated ? (
                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                      IT Configured
+                      Connected
+                    </span>
+                  ) : slackOAuthStatus?.configured ? (
+                    <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
+                      Not Connected
                     </span>
                   ) : (
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
@@ -324,7 +538,7 @@ export function Sources() {
                     </span>
                   )}
                 </h3>
-                <p className="text-sm text-gray-600">Company Slack app with Socket Mode managed by IT team</p>
+                <p className="text-sm text-gray-600">Individual Slack OAuth connection managed by IT team</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -335,42 +549,76 @@ export function Sources() {
                 {showInstructions.slack ? 'Hide' : 'IT Setup info'}
               </button>
               <button 
-                onClick={() => handleTestConnection('slack')}
-                disabled={testing === 'slack'}
+                onClick={handleSlackOAuth}
+                disabled={testing === 'slack-oauth'}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                {testing === 'slack' ? 'Testing...' : 'Test Connection'}
+                {testing === 'slack-oauth' ? 'Processing...' : (slackOAuthStatus?.authenticated ? 'Reconnect' : 'Connect Slack')}
               </button>
             </div>
           </div>
 
+          {/* User Profile Display */}
+          {slackOAuthStatus?.authenticated && slackOAuthStatus?.user_info && (
+            <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center gap-3">
+                {slackOAuthStatus.user_info.avatar_url && (
+                  <img 
+                    src={slackOAuthStatus.user_info.avatar_url} 
+                    alt="User Avatar"
+                    className="w-12 h-12 rounded-full border-2 border-green-300"
+                  />
+                )}
+                <div>
+                  <h4 className="font-semibold text-green-900">
+                    {slackOAuthStatus.user_info.name || 'Unknown User'}
+                  </h4>
+                  {slackOAuthStatus.user_info.email && (
+                    <p className="text-sm text-green-700">{slackOAuthStatus.user_info.email}</p>
+                  )}
+                  {slackOAuthStatus.user_info.title && (
+                    <p className="text-xs text-green-600">{slackOAuthStatus.user_info.title}</p>
+                  )}
+                  <div className="flex items-center gap-4 mt-1">
+                    <span className="text-xs text-green-600">
+                      ✅ Connected to Slack
+                    </span>
+                    {slackOAuthStatus.user_info.is_admin && (
+                      <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">Admin</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showInstructions.slack && (
             <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <h4 className="font-semibold text-purple-900 mb-3">🛠️ IT Team Slack App Setup Instructions:</h4>
+              <h4 className="font-semibold text-purple-900 mb-3">🛠️ IT Team Slack OAuth Setup Instructions:</h4>
               <div className="text-sm text-purple-800 space-y-2">
-                <p><strong>Configure Company-wide Slack App:</strong></p>
+                <p><strong>Configure Individual Slack OAuth App:</strong></p>
                 <ol className="list-decimal list-inside ml-4 space-y-2 text-xs">
-                  <li>Create company Slack app "ZeroTask" at <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="underline">api.slack.com/apps</a></li>
-                  <li>Enable Socket Mode and generate App Token (xapp-) with <code className="bg-purple-100 px-1 rounded">connections:write</code> scope</li>
-                  <li>Configure Bot Token Scopes: <code className="bg-purple-100 px-1 rounded">app_mentions:read</code>, <code className="bg-purple-100 px-1 rounded">channels:history</code>, <code className="bg-purple-100 px-1 rounded">chat:write</code>, <code className="bg-purple-100 px-1 rounded">im:history</code></li>
-                  <li>Install app to workspace and copy Bot Token (xoxb-)</li>
+                  <li>Create Slack app "ZeroTask OAuth" at <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="underline">api.slack.com/apps</a></li>
+                  <li>Configure OAuth & Permissions with redirect URL: <code className="bg-purple-100 px-1 rounded">https://1012d16f9d68.ngrok-free.app/oauth2/slack/callback</code></li>
+                  <li>Add Bot Token Scopes: <code className="bg-purple-100 px-1 rounded">channels:read</code>, <code className="bg-purple-100 px-1 rounded">chat:write</code>, <code className="bg-purple-100 px-1 rounded">users:read</code>, <code className="bg-purple-100 px-1 rounded">users:read.email</code>, <code className="bg-purple-100 px-1 rounded">channels:history</code></li>
+                  <li>Copy Client ID and Client Secret from Basic Information</li>
                   <li>Configure environment variables:
                     <div className="ml-4 mt-1">
-                      <code className="bg-purple-100 px-2 py-1 rounded block text-xs">SLACK_APP_TOKEN=xapp-your_app_token</code>
-                      <code className="bg-purple-100 px-2 py-1 rounded block text-xs mt-1">SLACK_BOT_TOKEN=xoxb-your_bot_token</code>
+                      <code className="bg-purple-100 px-2 py-1 rounded block text-xs">SLACK_CLIENT_ID=your_oauth_client_id</code>
+                      <code className="bg-purple-100 px-2 py-1 rounded block text-xs mt-1">SLACK_CLIENT_SECRET=your_oauth_client_secret</code>
                     </div>
                   </li>
                 </ol>
                 <div className="mt-3 p-2 bg-purple-100 rounded text-xs">
-                  <p><strong>🔒 Security:</strong> Service account tokens managed centrally by IT team</p>
-                  <p><strong>📋 Access:</strong> Bot will be added to relevant channels by IT team</p>
+                  <p><strong>🔒 Security:</strong> Individual OAuth tokens managed per user</p>
+                  <p><strong>📋 Access:</strong> Users individually authorize access to their Slack workspace</p>
                 </div>
               </div>
             </div>
           )}
           
           <div className="text-sm text-gray-500">
-            Socket Mode scopes: <code>app_mentions:read</code>, <code>channels:history</code>, <code>chat:write</code>, <code>im:history</code>
+            OAuth scopes: <code>channels:read</code>, <code>chat:write</code>, <code>users:read</code>, <code>users:read.email</code>, <code>channels:history</code>
           </div>
         </div>
 
